@@ -153,6 +153,7 @@ func mergeJson(base, overlay interface{}) (interface{}, error) {
 			}
 		}
 		return result, nil
+
 	case []interface{}:
 		baseSlice := base.([]interface{})
 		overlaySlice := overlay.([]interface{})
@@ -160,10 +161,8 @@ func mergeJson(base, overlay interface{}) (interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
-		for _, val := range overlaySlice {
-			result = append(result, val)
-		}
-		return result, nil
+		return append(result, overlaySlice...), nil
+
 	default:
 		return nil, fmt.Errorf("unsupported type")
 	}
