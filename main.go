@@ -11,6 +11,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"testing"
 )
 
 var (
@@ -19,6 +20,8 @@ var (
 )
 
 func init() {
+	testing.Init()
+
 	var showVersion bool
 	flag.BoolVar(&showVersion, "v", false, "show application version")
 	flag.BoolVar(&showVersion, "version", false, "show application version")
@@ -32,29 +35,32 @@ func init() {
 
 func main() {
 	// parse flag
-	var dir string
 	var n int
 	var err error
 	args := flag.Args()
 	if len(args) < 2 {
 		log.Fatal("invalid arguments")
 	}
-	dir = args[0]
+	dir := args[0]
+	jsonName := args[1]
 	if len(args) >= 3 {
 		n, err = strconv.Atoi(args[2])
 		if err != nil {
 			log.Fatal("invalid arguments")
 		}
 	}
-
 	// n: 何階層辿るか を決定
-	pathes := len(strings.Split(filepath.ToSlash(dir), "/"))
+	absPath, err := filepath.Abs(dir)
+	if err != nil {
+		log.Fatal(err)
+	}
+	pathes := len(strings.Split(filepath.ToSlash(absPath), "/"))
 	if n <= 0 || pathes < n {
 		n = pathes
 	}
 
 	// merge した結果を格納
-	result := ReadFileAndMergeJson(args[0], args[1], n)
+	result := ReadFileAndMergeJson(absPath, jsonName, n)
 	output, err := json.Marshal(result)
 	if err != nil {
 		log.Fatal(err)
@@ -147,6 +153,7 @@ func mergeJson(base, overlay interface{}) (interface{}, error) {
 			}
 		}
 		return result, nil
+
 	case []interface{}:
 		baseSlice := base.([]interface{})
 		overlaySlice := overlay.([]interface{})
@@ -154,26 +161,8 @@ func mergeJson(base, overlay interface{}) (interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
-		for idx, val := range overlaySlice {
-			var r interface{}
-			switch val.(type) {
-			case map[string]interface{}:
-				r, err = mergeJson(baseSlice[idx], val)
-			case []interface{}:
-				r, err = mergeJson(baseSlice[idx], val)
-			default:
-				if !contains(baseSlice, val) {
-					r = val
-				}
-			}
-			if err != nil {
-				return nil, err
-			}
-			if reflect.ValueOf(r).IsValid() && (reflect.TypeOf(r).Kind() != reflect.Ptr || !reflect.ValueOf(r).IsNil()) {
-				result = append(result, reflect.Indirect(reflect.ValueOf(r)).Interface())
-			}
-		}
-		return result, nil
+		return append(result, overlaySlice...), nil
+
 	default:
 		return nil, fmt.Errorf("unsupported type")
 	}
